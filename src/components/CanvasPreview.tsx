@@ -46,29 +46,43 @@ export const CanvasPreview = () => {
 
   const handleExport = () => {
     if (!stageRef.current) return;
-    const canvas = stageRef.current.toCanvas();
-    const stream = canvas.captureStream(30); 
     
+    // THE FIX: Grab the live HTML5 Canvas from the DOM so the video actually moves!
+    const stage = stageRef.current;
+    const canvas = stage.container().querySelector('canvas');
+    if (!canvas) return;
+
+    const stream = canvas.captureStream(30); 
     recordedChunks.current = [];
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    
+    // MP4 CHECK: Try to force MP4 if supported, else fallback to standard WebM
+    let options = { mimeType: 'video/webm' };
+    if (MediaRecorder.isTypeSupported('video/mp4')) {
+      options = { mimeType: 'video/mp4' };
+    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
+      options = { mimeType: 'video/webm;codecs=h264' };
+    }
+
+    const recorder = new MediaRecorder(stream, options);
     
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) recordedChunks.current.push(e.data);
     };
     
     recorder.onstop = () => {
-      const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
+      const ext = options.mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(recordedChunks.current, { type: options.mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'floorplan-tour.webm';
+      a.download = `floorplan-tour.${ext}`;
       a.click();
       window.URL.revokeObjectURL(url);
     };
 
     mediaRecorderRef.current = recorder;
     recorder.start();
-    play();
+    play(); // Start the animation immediately after starting the recording
   };
 
   useEffect(() => {
@@ -108,13 +122,13 @@ export const CanvasPreview = () => {
          </div>
 
          <button onClick={handleExport} disabled={isPlaying || rooms.length === 0} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 py-3 mt-2 rounded font-bold transition-colors flex items-center justify-center gap-2">
-           🎥 Record & Download .WebM
+           🎥 Record & Download Video
          </button>
 
          {/* TIMING GUIDE */}
          <div className="mt-4 bg-slate-900 p-4 rounded border border-slate-700">
            <h3 className="text-sm font-bold text-white mb-2">Voiceover Timing Guide</h3>
-           <p className="text-xs text-slate-400 mb-3">Use these exact timestamps in your external MP3 generator to match the visual pacing.</p>
+           <p className="text-xs text-slate-400 mb-3">Use these exact timestamps in your external MP3 generator.</p>
            <ul className="text-xs text-slate-300 space-y-2 max-h-48 overflow-y-auto pr-2">
              {rooms.map((r, i) => (
                 <li key={r.id} className="flex justify-between border-b border-slate-800 pb-1">
