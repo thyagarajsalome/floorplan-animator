@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 
-// Make sure to add the 'export' keyword here!
 export interface Room {
   id: string;
   label: string;
-  boundingBox: [number, number, number, number]; // [xmin, ymin, xmax, ymax]
-  color?: string;
+  boundingBox: [number, number, number, number]; 
+  color: string;
+  strokeWidth: number; // <-- New property for line thickness
 }
 
 interface AppState {
@@ -18,14 +18,17 @@ interface AppState {
   status: 'idle' | 'analyzing' | 'ready';
   setStatus: (status: 'idle' | 'analyzing' | 'ready') => void;
   
-  // New actions for manual zoning
   addRoom: (room: Room) => void;
   removeRoom: (id: string) => void;
   clearRooms: () => void;
+  updateRoom: (id: string, updates: Partial<Room>) => void; // <-- New update action
+  
+  selectedRoomId: string | null; // <-- New selection state
+  setSelectedRoomId: (id: string | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
-  apiKey: localStorage.getItem('gemini_api_key'), // Load from browser storage immediately
+  apiKey: localStorage.getItem('gemini_api_key'), 
   setApiKey: (key) => {
     localStorage.setItem('gemini_api_key', key);
     set({ apiKey: key });
@@ -37,8 +40,16 @@ export const useStore = create<AppState>((set) => ({
   status: 'idle',
   setStatus: (status) => set({ status }),
 
-  // Implementation of manual zoning actions
   addRoom: (room) => set((state) => ({ rooms: [...state.rooms, room] })),
-  removeRoom: (id) => set((state) => ({ rooms: state.rooms.filter(r => r.id !== id) })),
-  clearRooms: () => set({ rooms: [] }),
+  removeRoom: (id) => set((state) => ({ 
+    rooms: state.rooms.filter(r => r.id !== id),
+    selectedRoomId: state.selectedRoomId === id ? null : state.selectedRoomId
+  })),
+  clearRooms: () => set({ rooms: [], selectedRoomId: null }),
+  updateRoom: (id, updates) => set((state) => ({
+    rooms: state.rooms.map(room => room.id === id ? { ...room, ...updates } : room)
+  })),
+  
+  selectedRoomId: null,
+  setSelectedRoomId: (id) => set({ selectedRoomId: id }),
 }));
