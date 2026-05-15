@@ -11,8 +11,8 @@ export const ZoneEditor = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [newRect, setNewRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
   
-  // Settings for the NEXT room drawn
-  const [currentStrokeWidth, setCurrentStrokeWidth] = useState(6);
+  // Settings for the NEXT room drawn (Thickness defaults to 2px)
+  const [currentStrokeWidth, setCurrentStrokeWidth] = useState(2);
   const [currentColor, setCurrentColor] = useState(PRESET_COLORS[3]);
 
   const CANVAS_WIDTH = 450;
@@ -74,6 +74,7 @@ export const ZoneEditor = () => {
           <Layer>
             {image && <KonvaImage image={image} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />}
             
+            {/* Draw previously saved rooms */}
             {rooms.map((room) => {
               const [xmin, ymin, xmax, ymax] = room.boundingBox;
               const x = xmin * CANVAS_WIDTH; const y = ymin * CANVAS_HEIGHT;
@@ -86,15 +87,22 @@ export const ZoneEditor = () => {
                     id={room.id} name="existing-zone" width={w} height={h}
                     fill={room.color} opacity={isSelected ? 0.6 : 0.3}
                     stroke={isSelected ? '#ffffff' : room.color} 
-                    strokeWidth={room.strokeWidth || 6}
+                    strokeWidth={room.strokeWidth || 2} 
                     onMouseEnter={(e) => { const c = e.target.getStage()?.container(); if (c) c.style.cursor = 'pointer'; }}
                     onMouseLeave={(e) => { const c = e.target.getStage()?.container(); if (c) c.style.cursor = 'crosshair'; }}
                   />
-                  <Text y={-20} text={room.label} fill="white" fontStyle="bold" shadowColor="black" shadowBlur={2} />
+                  {/* Smaller, Centered Text inside the box */}
+                  <Text 
+                    x={0} y={0} width={w} height={h} 
+                    align="center" verticalAlign="middle"
+                    text={room.label} fill="white" fontStyle="bold" fontSize={14} 
+                    shadowColor="black" shadowBlur={3} 
+                  />
                 </Group>
               );
             })}
 
+            {/* Draw the rectangle currently being dragged */}
             {newRect && (
               <Rect x={newRect.x} y={newRect.y} width={newRect.w} height={newRect.h} fill="rgba(255, 255, 255, 0.2)" stroke="white" strokeWidth={2} dash={[5, 5]} />
             )}
@@ -114,21 +122,22 @@ export const ZoneEditor = () => {
           </p>
         </div>
 
-        {/* Thickness Slider */}
+        {/* Thickness Dropdown */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">
-            Line Thickness: {selectedRoom ? selectedRoom.strokeWidth : currentStrokeWidth}px
-          </label>
-          <input 
-            type="range" min="2" max="16" step="1"
-            value={selectedRoom ? (selectedRoom.strokeWidth || 6) : currentStrokeWidth}
+          <label className="block text-sm font-medium text-slate-300 mb-2">Line Thickness</label>
+          <select 
+            value={selectedRoom ? (selectedRoom.strokeWidth || 2) : currentStrokeWidth}
             onChange={(e) => {
               const val = Number(e.target.value);
               if (selectedRoom) updateRoom(selectedRoom.id, { strokeWidth: val });
               else setCurrentStrokeWidth(val);
             }}
-            className="w-full cursor-pointer accent-blue-500"
-          />
+            className="w-full bg-slate-900 border border-slate-600 text-white rounded px-3 py-2 cursor-pointer focus:outline-none focus:border-blue-500"
+          >
+            {[2, 4, 6, 8, 10, 12, 14, 16].map(val => (
+              <option key={val} value={val}>{val}px {val === 2 ? '(Default)' : ''}</option>
+            ))}
+          </select>
         </div>
 
         {/* Color Picker */}

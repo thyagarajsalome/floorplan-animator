@@ -5,7 +5,7 @@ export interface Room {
   label: string;
   boundingBox: [number, number, number, number]; 
   color: string;
-  strokeWidth: number; // <-- New property for line thickness
+  strokeWidth: number; // <-- Property for line thickness
 }
 
 interface AppState {
@@ -21,10 +21,14 @@ interface AppState {
   addRoom: (room: Room) => void;
   removeRoom: (id: string) => void;
   clearRooms: () => void;
-  updateRoom: (id: string, updates: Partial<Room>) => void; // <-- New update action
+  updateRoom: (id: string, updates: Partial<Room>) => void; // <-- Update action
   
-  selectedRoomId: string | null; // <-- New selection state
+  selectedRoomId: string | null; // <-- Selection state
   setSelectedRoomId: (id: string | null) => void;
+
+  // --- NEW: Audio State for MP3 Voiceovers ---
+  audioUrl: string | null;
+  setAudioUrl: (url: string | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -52,4 +56,8 @@ export const useStore = create<AppState>((set) => ({
   
   selectedRoomId: null,
   setSelectedRoomId: (id) => set({ selectedRoomId: id }),
+
+  // --- NEW: Audio Initializer ---
+  audioUrl: null,
+  setAudioUrl: (url) => set({ audioUrl: url })
 }));
