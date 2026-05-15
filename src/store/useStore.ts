@@ -8,6 +8,9 @@ export interface Room {
   strokeWidth: number;
   fontSize?: number;
   textColor?: string;
+  script?: string;
+  audioUrl?: string;
+  audioDuration?: number;
 }
 
 export interface Toast {
@@ -17,9 +20,11 @@ export interface Toast {
 }
 
 interface AppState {
-  // API Key
+  // API Keys
   apiKey: string | null;
   setApiKey: (key: string) => void;
+  openaiApiKey: string | null;
+  setOpenaiApiKey: (key: string) => void;
 
   // Image
   imageBase64: string | null;
@@ -64,11 +69,16 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set, get) => ({
-  // API Key (from local storage, fallback to .env)
+  // API Keys (from local storage, fallback to .env)
   apiKey: localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || null,
   setApiKey: (key) => {
     localStorage.setItem('gemini_api_key', key);
     set({ apiKey: key });
+  },
+  openaiApiKey: localStorage.getItem('openai_api_key') || import.meta.env.VITE_OPENAI_API_KEY || null,
+  setOpenaiApiKey: (key) => {
+    localStorage.setItem('openai_api_key', key);
+    set({ openaiApiKey: key });
   },
 
   // Image

@@ -62,26 +62,74 @@ export const CanvasPreview = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [currentRoomLabel, setCurrentRoomLabel] = useState('');
 
+  // Web Audio API refs for capturing TTS
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const audioElemRef = useRef<HTMLAudioElement | null>(null);
+
+  const getAudioSetup = () => {
+    if (!audioContextRef.current) {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const dest = ctx.createMediaStreamDestination();
+      const audio = new Audio();
+      audio.crossOrigin = 'anonymous';
+      const source = ctx.createMediaElementSource(audio);
+      source.connect(ctx.destination); // Play to speakers
+      source.connect(dest);            // Route to media stream
+      
+      audioContextRef.current = ctx;
+      audioDestRef.current = dest;
+      audioElemRef.current = audio;
+    }
+    return { dest: audioDestRef.current!, audio: audioElemRef.current! };
+  };
+
   const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasDimensions(
     imageDimensions?.width ?? 0,
     imageDimensions?.height ?? 0,
   );
 
-  // Track current room label for HUD
+  // Track current room label and play audio
   useEffect(() => {
     if (activeRoomIndex >= 0 && activeRoomIndex < rooms.length) {
       setCurrentRoomLabel(rooms[activeRoomIndex].label);
     } else {
       setCurrentRoomLabel('');
     }
-  }, [activeRoomIndex, rooms]);
+
+    if (!isPlaying) {
+      if (audioElemRef.current) {
+        audioElemRef.current.pause();
+        audioElemRef.current.currentTime = 0;
+      }
+      return;
+    }
+
+    if (activeRoomIndex >= 0 && activeRoomIndex < rooms.length) {
+      const room = rooms[activeRoomIndex];
+      if (room.audioUrl) {
+        const { audio } = getAudioSetup();
+        audio.src = room.audioUrl;
+        audio.playbackRate = animationSpeed;
+        audio.play().catch(e => console.error('Audio play failed:', e));
+      }
+    }
+  }, [activeRoomIndex, isPlaying, rooms, animationSpeed]);
 
   const handleExport = () => {
     if (!stageRef.current) return;
     const canvas = stageRef.current.container().querySelector('canvas');
     if (!canvas) return;
 
-    const stream = canvas.captureStream(30);
+    const { dest } = getAudioSetup();
+    const canvasStream = canvas.captureStream(30);
+    
+    // Combine video from canvas and audio from TTS
+    const combinedTracks = [
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks()
+    ];
+    const stream = new MediaStream(combinedTracks);
     recordedChunks.current = [];
 
     let options = { mimeType: 'video/webm' };
@@ -115,14 +163,6 @@ export const CanvasPreview = () => {
       mediaRecorderRef.current.stop();
     }
   }, [isPlaying]);
-
-  // Compute voiceover timings
-  const effectiveDuration = durationPerRoom / animationSpeed;
-  const timings = rooms.map((r, i) => ({
-    label: r.label,
-    start: ((i * effectiveDuration) / 1000).toFixed(1),
-    end: (((i + 1) * effectiveDuration) / 1000).toFixed(1),
-  }));
 
   if (!imageBase64) return null;
 
@@ -237,7 +277,7 @@ export const CanvasPreview = () => {
               disabled={isPlaying || rooms.length === 0 || isRecording}
               className="btn-emerald"
             >
-              {isRecording ? '🔴 Recording…' : '🎥 Record & Download Video'}
+              {isRecording ? '🔴 Recording…' : '🎥 Export YouTube Short (MP4)'}
             </button>
           </div>
         </div>
@@ -258,39 +298,17 @@ export const CanvasPreview = () => {
           <RoomList />
         </div>
 
-        {/* Voiceover timing guide */}
+        {/* Auto-Timing info */}
         <div className="card" style={{ padding: '18px' }}>
           <h2 style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-            🎙 Voiceover Timing
+            🎙 Voiceover Sync
           </h2>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-            Use these timestamps when recording narration.
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
+            This animation is <strong>100% audio-driven</strong>. The duration of each zone perfectly matches the length of its generated TTS audio.
           </p>
-          <ul style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
-            {timings.map((t, i) => (
-              <li
-                key={t.label + i}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '0.8125rem',
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  background: activeRoomIndex === i && isPlaying ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${activeRoomIndex === i && isPlaying ? 'rgba(16,185,129,0.25)' : 'transparent'}`,
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: '8px' }}>
-                  {i + 1}. {t.label}
-                </span>
-                <span style={{ color: '#34d399', fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                  {t.start}s–{t.end}s
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div style={{ padding: '10px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', fontSize: '0.75rem', color: '#34d399', fontWeight: 500 }}>
+            ✓ Audio track will be merged into the exported MP4 file automatically.
+          </div>
         </div>
       </div>
     </div>

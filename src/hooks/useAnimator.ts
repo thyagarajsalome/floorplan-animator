@@ -22,21 +22,19 @@ export const useAnimator = () => {
     setTotalProgress(0);
     startTimeRef.current = performance.now();
 
-    const effectiveDuration = durationPerRoom / animationSpeed;
-    const totalDuration = effectiveDuration * rooms.length;
+    // Calculate individual and cumulative timings
+    const timings = rooms.map(r => (r.audioDuration || durationPerRoom) / animationSpeed);
+    const totalDuration = timings.reduce((a, b) => a + b, 0);
 
     const animate = (time: number) => {
       if (!isPlayingRef.current) return;
 
       const elapsed = time - startTimeRef.current;
-      const newIndex = Math.floor(elapsed / effectiveDuration);
-      const newProgress = (elapsed % effectiveDuration) / effectiveDuration;
       const newTotalProgress = Math.min(elapsed / totalDuration, 1);
 
-      if (newIndex >= rooms.length) {
+      if (elapsed >= totalDuration) {
         // Animation finished
         if (loopAnimation && isPlayingRef.current) {
-          // Loop: restart from beginning
           startTimeRef.current = performance.now();
           setActiveRoomIndex(0);
           setProgress(0);
@@ -52,6 +50,24 @@ export const useAnimator = () => {
         return;
       }
 
+      // Find which room we are currently in
+      let currentTotal = 0;
+      let newIndex = 0;
+      let roomStart = 0;
+      let roomDuration = timings[0];
+
+      for (let i = 0; i < timings.length; i++) {
+        if (elapsed >= currentTotal && elapsed < currentTotal + timings[i]) {
+          newIndex = i;
+          roomStart = currentTotal;
+          roomDuration = timings[i];
+          break;
+        }
+        currentTotal += timings[i];
+      }
+
+      const newProgress = (elapsed - roomStart) / roomDuration;
+
       setActiveRoomIndex(newIndex);
       setProgress(newProgress);
       setTotalProgress(newTotalProgress);
@@ -60,7 +76,7 @@ export const useAnimator = () => {
 
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
     animationRef.current = requestAnimationFrame(animate);
-  }, [rooms.length, animationSpeed, durationPerRoom, loopAnimation]);
+  }, [rooms, animationSpeed, durationPerRoom, loopAnimation]);
 
   const stop = useCallback(() => {
     isPlayingRef.current = false;

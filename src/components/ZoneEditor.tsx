@@ -4,6 +4,7 @@ import useImage from 'use-image';
 import { useStore } from '../store/useStore';
 import { getCanvasDimensions } from '../utils/canvasDimensions';
 import { RoomList } from './RoomList';
+import { useTTS } from '../hooks/useTTS';
 
 const PRESET_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#06B6D4'];
 const TEXT_COLORS = ['#ffffff', '#000000', '#FDE047', '#ef4444'];
@@ -94,8 +95,10 @@ export const ZoneEditor = () => {
     imageBase64, imageDimensions, rooms,
     addRoom, removeRoom, clearRooms, updateRoom,
     selectedRoomId, setSelectedRoomId, undo, roomHistory,
-    addToast,
+    addToast, openaiApiKey
   } = useStore();
+
+  const { generateVoiceover, generateAllMissing, isGenerating } = useTTS();
 
   const [image] = useImage(imageBase64 || '');
   const [isDrawing, setIsDrawing] = useState(false);
@@ -253,10 +256,10 @@ export const ZoneEditor = () => {
               {newRect && (
                 <Rect
                   x={newRect.x} y={newRect.y} width={newRect.w} height={newRect.h}
-                  fill={`${currentColor}33`}
+                  fill={currentColor}
+                  opacity={0.35}
                   stroke={currentColor}
-                  strokeWidth={2}
-                  dash={[6, 4]}
+                  strokeWidth={currentStrokeWidth}
                 />
               )}
             </Layer>
@@ -284,7 +287,30 @@ export const ZoneEditor = () => {
                   value={selectedRoom.label}
                   onChange={(e) => updateRoom(selectedRoom.id, { label: e.target.value })}
                   className="input-field"
+                  style={{ marginBottom: '14px' }}
                 />
+
+                <label className="label" htmlFor="zone-script-input">Voiceover Script</label>
+                <textarea
+                  id="zone-script-input"
+                  value={selectedRoom.script || ''}
+                  onChange={(e) => {
+                    updateRoom(selectedRoom.id, { script: e.target.value });
+                    // If they edit the script, clear the old audio so it prompts regeneration
+                    if (selectedRoom.audioUrl) updateRoom(selectedRoom.id, { audioUrl: undefined, audioDuration: undefined });
+                  }}
+                  placeholder="e.g. Welcome to the spacious master bedroom..."
+                  className="input-field"
+                  style={{ minHeight: '80px', resize: 'vertical' }}
+                />
+                <button
+                  onClick={() => generateVoiceover(selectedRoom.id, selectedRoom.script || '')}
+                  disabled={!selectedRoom.script?.trim() || !!selectedRoom.audioUrl || !openaiApiKey}
+                  className="btn-ghost"
+                  style={{ marginTop: '8px', fontSize: '0.75rem', padding: '6px' }}
+                >
+                  {selectedRoom.audioUrl ? '✓ Audio Generated' : '🎙 Generate Audio'}
+                </button>
               </div>
             )}
 
@@ -413,19 +439,26 @@ export const ZoneEditor = () => {
                   onClick={() => { undo(); addToast('Undo.', 'info'); }}
                   title="Undo (Ctrl+Z)"
                   style={{
-                    fontSize: '0.75rem',
-                    color: '#60a5fa',
-                    background: 'rgba(59,130,246,0.1)',
-                    border: '1px solid rgba(59,130,246,0.2)',
-                    borderRadius: '6px',
-                    padding: '4px 10px',
-                    cursor: 'pointer',
+                    fontSize: '0.75rem', color: '#60a5fa', background: 'rgba(59,130,246,0.1)',
+                    border: '1px solid rgba(59,130,246,0.2)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer',
                   }}
                 >
                   ↩ Undo
                 </button>
               )}
             </div>
+            
+            {rooms.length > 0 && (
+              <button
+                onClick={generateAllMissing}
+                disabled={isGenerating || !openaiApiKey}
+                className="btn-emerald"
+                style={{ marginBottom: '16px', padding: '10px' }}
+              >
+                {isGenerating ? 'Generating...' : '🎙 Generate All Missing Voiceovers'}
+              </button>
+            )}
+
             <RoomList />
           </div>
 
