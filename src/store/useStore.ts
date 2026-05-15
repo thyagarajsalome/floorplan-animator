@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+// Make sure to add the 'export' keyword here!
 export interface Room {
   id: string;
   label: string;

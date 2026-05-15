@@ -1,29 +1,24 @@
 import { ApiKeyInput } from './components/ApiKeyInput';
 import { UploadPanel } from './components/UploadPanel';
+import { CanvasPreview } from './components/CanvasPreview';
 import { useStore } from './store/useStore';
 
 function App() {
-  const { rooms, status } = useStore();
+  const { status } = useStore();
 
   return (
-    <div className="min-h-screen p-8 flex flex-col items-center">
-      <header className="mb-8 text-center mt-10">
-        <h1 className="text-3xl font-bold text-white mb-2">FloorPlan Animator</h1>
-        <p className="text-slate-400">Upload a 9:16 plan to generate an animated tour.</p>
+    <div className="min-h-screen p-8 flex flex-col items-center pb-20">
+      <header className="mb-8 text-center mt-4">
+        <h1 className="text-3xl font-bold text-white mb-2">Auto-Zoner</h1>
+        <p className="text-slate-400">Automate your 9:16 floor plan highlighting.</p>
       </header>
 
-      <ApiKeyInput />
-      <UploadPanel />
-
-      {/* Temporary output to verify the AI is working */}
-      {status === 'ready' && rooms.length > 0 && (
-        <div className="mt-8 p-4 bg-slate-800 border border-slate-700 rounded w-full max-w-md">
-          <h3 className="text-lg font-bold mb-2 text-emerald-400">AI Detection Success!</h3>
-          <pre className="text-xs text-slate-300 overflow-auto max-h-40">
-            {JSON.stringify(rooms, null, 2)}
-          </pre>
-        </div>
-      )}
+      {status !== 'ready' && <ApiKeyInput />}
+      {status !== 'ready' && <UploadPanel />}
+      
+      {/* Show the canvas once the image is uploaded and analyzed */}
+      <CanvasPreview />
+      
     </div>
   );
 }
