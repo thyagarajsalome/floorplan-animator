@@ -64,8 +64,8 @@ interface AppState {
 }
 
 export const useStore = create<AppState>((set, get) => ({
-  // API Key
-  apiKey: localStorage.getItem('gemini_api_key'),
+  // API Key (from local storage, fallback to .env)
+  apiKey: localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || null,
   setApiKey: (key) => {
     localStorage.setItem('gemini_api_key', key);
     set({ apiKey: key });
