@@ -4,6 +4,7 @@ import useImage from 'use-image';
 import { useStore } from '../store/useStore';
 
 const PRESET_COLORS = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#ffffff'];
+const TEXT_COLORS = ['#ffffff', '#000000', '#FDE047', '#ef4444']; // White, Black, Yellow, Red
 
 export const ZoneEditor = () => {
   const { imageBase64, rooms, addRoom, removeRoom, clearRooms, selectedRoomId, setSelectedRoomId, updateRoom } = useStore();
@@ -11,7 +12,6 @@ export const ZoneEditor = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [newRect, setNewRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
   
-  // Settings for the NEXT room drawn (Thickness defaults to 2px)
   const [currentStrokeWidth, setCurrentStrokeWidth] = useState(2);
   const [currentColor, setCurrentColor] = useState(PRESET_COLORS[3]);
 
@@ -24,7 +24,7 @@ export const ZoneEditor = () => {
       setSelectedRoomId(e.target.id());
       return;
     }
-    setSelectedRoomId(null); // Deselect if clicking empty space
+    setSelectedRoomId(null); 
     const pos = e.target.getStage().getPointerPosition();
     setIsDrawing(true);
     setNewRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
@@ -41,8 +41,7 @@ export const ZoneEditor = () => {
     setIsDrawing(false);
 
     if (Math.abs(newRect.w) < 10 || Math.abs(newRect.h) < 10) {
-      setNewRect(null);
-      return;
+      setNewRect(null); return;
     }
 
     const roomName = window.prompt("Enter room name (e.g., Master Bedroom):");
@@ -57,7 +56,9 @@ export const ZoneEditor = () => {
         label: roomName,
         boundingBox: [xmin, ymin, xmax, ymax],
         color: currentColor,
-        strokeWidth: currentStrokeWidth
+        strokeWidth: currentStrokeWidth,
+        fontSize: 14,
+        textColor: '#ffffff'
       });
     }
     setNewRect(null);
@@ -68,13 +69,12 @@ export const ZoneEditor = () => {
   return (
     <div className="flex flex-col lg:flex-row gap-8 w-full justify-center items-start mt-4">
       
-      {/* LEFT VIEW: The Canvas */}
-      <div className="border-4 border-slate-700 rounded-lg overflow-hidden bg-slate-900 cursor-crosshair shadow-2xl shrink-0">
-        <Stage width={CANVAS_WIDTH} height={CANVAS_HEIGHT} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+      {/* LEFT VIEW: The Canvas wrapped in a relative container for the floating snippet */}
+      <div className="relative border-4 border-slate-700 rounded-lg overflow-hidden bg-slate-900 shadow-2xl shrink-0">
+        <Stage width={CANVAS_WIDTH} height={CANVAS_HEIGHT} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} className="cursor-crosshair">
           <Layer>
             {image && <KonvaImage image={image} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />}
             
-            {/* Draw previously saved rooms */}
             {rooms.map((room) => {
               const [xmin, ymin, xmax, ymax] = room.boundingBox;
               const x = xmin * CANVAS_WIDTH; const y = ymin * CANVAS_HEIGHT;
@@ -86,43 +86,59 @@ export const ZoneEditor = () => {
                   <Rect
                     id={room.id} name="existing-zone" width={w} height={h}
                     fill={room.color} opacity={isSelected ? 0.6 : 0.3}
-                    stroke={isSelected ? '#ffffff' : room.color} 
-                    strokeWidth={room.strokeWidth || 2} 
+                    stroke={isSelected ? '#ffffff' : room.color} strokeWidth={room.strokeWidth || 2} 
                     onMouseEnter={(e) => { const c = e.target.getStage()?.container(); if (c) c.style.cursor = 'pointer'; }}
                     onMouseLeave={(e) => { const c = e.target.getStage()?.container(); if (c) c.style.cursor = 'crosshair'; }}
                   />
-                  {/* Smaller, Centered Text inside the box */}
                   <Text 
-                    x={0} y={0} width={w} height={h} 
-                    align="center" verticalAlign="middle"
-                    text={room.label} fill="white" fontStyle="bold" fontSize={14} 
+                    x={0} y={0} width={w} height={h} align="center" verticalAlign="middle"
+                    text={room.label} fill={room.textColor || 'white'} fontStyle="bold" fontSize={room.fontSize || 14} 
                     shadowColor="black" shadowBlur={3} 
                   />
                 </Group>
               );
             })}
-
-            {/* Draw the rectangle currently being dragged */}
-            {newRect && (
-              <Rect x={newRect.x} y={newRect.y} width={newRect.w} height={newRect.h} fill="rgba(255, 255, 255, 0.2)" stroke="white" strokeWidth={2} dash={[5, 5]} />
-            )}
+            {newRect && <Rect x={newRect.x} y={newRect.y} width={newRect.w} height={newRect.h} fill="rgba(255, 255, 255, 0.2)" stroke="white" strokeWidth={2} dash={[5, 5]} />}
           </Layer>
         </Stage>
+
+        {/* INLINE EDITING SNIPPET */}
+        {selectedRoom && (
+          <div 
+            className="absolute z-20 bg-slate-800 p-2 rounded shadow-2xl border border-slate-500 flex flex-col gap-2"
+            style={{
+              top: ((selectedRoom.boundingBox[1] + selectedRoom.boundingBox[3]) / 2) * CANVAS_HEIGHT,
+              left: ((selectedRoom.boundingBox[0] + selectedRoom.boundingBox[2]) / 2) * CANVAS_WIDTH,
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            <input 
+              type="text" value={selectedRoom.label}
+              onChange={(e) => updateRoom(selectedRoom.id, { label: e.target.value })}
+              className="bg-slate-900 text-white text-xs px-2 py-1 rounded w-32 border border-slate-600 focus:outline-none focus:border-blue-500"
+            />
+            <div className="flex justify-between items-center gap-4">
+              <div className="flex gap-1 bg-slate-900 rounded p-1 border border-slate-600">
+                <button onClick={() => updateRoom(selectedRoom.id, { fontSize: Math.max(8, (selectedRoom.fontSize || 14) - 2) })} className="text-white hover:text-blue-400 font-bold px-1" title="Smaller">A-</button>
+                <button onClick={() => updateRoom(selectedRoom.id, { fontSize: Math.min(48, (selectedRoom.fontSize || 14) + 2) })} className="text-white hover:text-blue-400 font-bold px-1" title="Larger">A+</button>
+              </div>
+              <div className="flex gap-1">
+                {TEXT_COLORS.map(c => (
+                  <button key={c} onClick={() => updateRoom(selectedRoom.id, { textColor: c })} className="w-4 h-4 rounded-full border border-slate-500" style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* RIGHT CONTROLLER: Sidebar Tools */}
+      {/* RIGHT CONTROLLER */}
       <div className="w-full lg:w-80 flex flex-col gap-6 bg-slate-800 p-6 rounded-lg border border-slate-700 shrink-0">
-        
         <div>
-          <h2 className="text-xl font-bold text-white mb-1">
-            {selectedRoom ? 'Edit Selected Zone' : 'New Zone Settings'}
-          </h2>
-          <p className="text-slate-400 text-xs">
-            {selectedRoom ? `Modifying: ${selectedRoom.label}` : 'These settings apply to the next box you draw.'}
-          </p>
+          <h2 className="text-xl font-bold text-white mb-1">{selectedRoom ? 'Edit Selected Zone' : 'New Zone Settings'}</h2>
+          <p className="text-slate-400 text-xs">{selectedRoom ? `Modifying: ${selectedRoom.label}` : 'These settings apply to the next box you draw.'}</p>
         </div>
 
-        {/* Thickness Dropdown */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">Line Thickness</label>
           <select 
@@ -140,16 +156,13 @@ export const ZoneEditor = () => {
           </select>
         </div>
 
-        {/* Color Picker */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">Highlight Color</label>
           <div className="flex flex-wrap gap-2">
             {PRESET_COLORS.map(color => (
               <button
-                key={color}
-                style={{ backgroundColor: color }}
-                className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 
-                  ${(selectedRoom ? selectedRoom.color : currentColor) === color ? 'border-white scale-110' : 'border-transparent'}`}
+                key={color} style={{ backgroundColor: color }}
+                className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${(selectedRoom ? selectedRoom.color : currentColor) === color ? 'border-white scale-110' : 'border-transparent'}`}
                 onClick={() => {
                   if (selectedRoom) updateRoom(selectedRoom.id, { color });
                   else setCurrentColor(color);
@@ -160,22 +173,10 @@ export const ZoneEditor = () => {
         </div>
 
         <hr className="border-slate-700 my-2" />
-
-        {/* Action Buttons */}
         {selectedRoom ? (
-          <button 
-            onClick={() => { if(window.confirm(`Delete ${selectedRoom.label}?`)) removeRoom(selectedRoom.id); }}
-            className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded transition-colors"
-          >
-            Delete Zone
-          </button>
+          <button onClick={() => { if(window.confirm(`Delete ${selectedRoom.label}?`)) removeRoom(selectedRoom.id); }} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded transition-colors">Delete Zone</button>
         ) : (
-          <button 
-            onClick={() => { if(window.confirm('Clear all zones?')) clearRooms(); }}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 rounded transition-colors"
-          >
-            Clear All Zones
-          </button>
+          <button onClick={() => { if(window.confirm('Clear all zones?')) clearRooms(); }} className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 rounded transition-colors">Clear All Zones</button>
         )}
       </div>
     </div>
