@@ -17,6 +17,11 @@ interface AppState {
   setRooms: (rooms: Room[]) => void;
   status: 'idle' | 'analyzing' | 'ready';
   setStatus: (status: 'idle' | 'analyzing' | 'ready') => void;
+  
+  // New actions for manual zoning
+  addRoom: (room: Room) => void;
+  removeRoom: (id: string) => void;
+  clearRooms: () => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -31,4 +36,9 @@ export const useStore = create<AppState>((set) => ({
   setRooms: (rooms) => set({ rooms }),
   status: 'idle',
   setStatus: (status) => set({ status }),
+
+  // Implementation of manual zoning actions
+  addRoom: (room) => set((state) => ({ rooms: [...state.rooms, room] })),
+  removeRoom: (id) => set((state) => ({ rooms: state.rooms.filter(r => r.id !== id) })),
+  clearRooms: () => set({ rooms: [] }),
 }));
