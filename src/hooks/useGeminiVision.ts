@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import { useStore, Room } from '../store/useStore';
+import { useStore } from '../store/useStore';
+import type { Room } from '../store/useStore';
 
 export const useGeminiVision = () => {
   const { apiKey, setRooms, setStatus } = useStore();
